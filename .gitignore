@@ -1,0 +1,24 @@
+# секреты — никогда не коммитить
+.secrets
+.env
+*.pem
+*.key
+
+# личные материалы доклада: не публикуем
+*.pptx
+Workshop_Transcript_*.md
+PREP_*.md
+.claude/
+
+# логи провода: тел запросов много, и там бывают рабочие данные
+wire.json
+wire.jsonl
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
