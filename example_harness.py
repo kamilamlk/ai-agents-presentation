@@ -1,14 +1,15 @@
 """
-Харнесс: модель предлагает, код проверяет и решает.
+A harness: the model proposes, the code verifies and decides.
 
     source ./anthropic-env.sh on
     python3 example_harness.py
 
-В расписании есть рейс через полночь. Модель выпишет 00:15 — правдоподобно
-и неверно. Код заметит, что времена перестали расти, и отправит исправлять.
+The timetable contains a trip that runs past midnight. The model will write
+00:15 -- plausible and wrong. The code notices that the times stopped increasing
+and sends it back to be fixed.
 
-Цикл вынесен в функцию run(client), чтобы его можно было протестировать
-с поддельным клиентом. См. test_harness.py.
+The loop lives in run(client) so it can be tested with a fake client.
+See test_harness.py.
 """
 
 import json
@@ -16,14 +17,14 @@ import re
 
 import anthropic
 
-TIMETABLE = "5А: 23:05, 23:40, 00:15"
+TIMETABLE = "5A: 23:05, 23:40, 00:15"
 
-SYSTEM = 'Ответ заканчивай блоком ```json вида {"times": ["06:15", "06:47"]}'
+SYSTEM = 'End your answer with a ```json block shaped like {"times": ["06:15", "06:47"]}'
 
 TOOLS = [
     {
         "name": "read_timetable",
-        "description": "Сырое расписание автобусов города.",
+        "description": "Raw bus timetable for a city.",
         "input_schema": {
             "type": "object",
             "properties": {"city": {"type": "string"}},
@@ -38,14 +39,14 @@ def read_timetable(city):
 
 
 def check(times):
-    """Проверка кодом. Стоит ноль и всегда отвечает одинаково."""
+    """Verification in code. Costs nothing and always answers the same."""
     for a, b in zip(times, times[1:]):
         if b <= a:
-            return f"{a} идёт перед {b}, времена должны расти. За полночь пиши 24:15, а не 00:15"
+            return f"{a} comes before {b}; times must increase. Past midnight write 24:15, not 00:15"
     return None
 
 
-def run(client, question="Выпиши времена рейса 5А в Ярославле.", log=print):
+def run(client, question="List the times of route 5A in Yaroslavl.", log=print):
     messages = [{"role": "user", "content": question}]
 
     for _ in range(6):
@@ -56,13 +57,13 @@ def run(client, question="Выпиши времена рейса 5А в Ярос
         messages.append({"role": "assistant", "content": r.content})
 
         if r.stop_reason not in ("tool_use", "end_turn"):
-            raise RuntimeError(f"неожиданный stop_reason: {r.stop_reason}")
+            raise RuntimeError(f"unexpected stop_reason: {r.stop_reason}")
 
         if r.stop_reason == "tool_use":
             results = []
             for b in r.content:
                 if b.type == "tool_use":
-                    log(f"модель  просит {b.name}")
+                    log(f"model  asks for {b.name}")
                     results.append({
                         "type": "tool_result",
                         "tool_use_id": b.id,
@@ -73,17 +74,17 @@ def run(client, question="Выпиши времена рейса 5А в Ярос
 
         text = "".join(b.text for b in r.content if b.type == "text")
         times = json.loads(re.search(r"```json\s*(.*?)\s*```", text, re.S).group(1))["times"]
-        log(f"модель  предлагает {times}")
+        log(f"model  proposes {times}")
 
         problem = check(times)
         if not problem:
-            log(f"код     принял {times}")
+            log(f"code   accepted {times}")
             return times
 
-        log(f"код     отклонил: {problem}")
-        messages.append({"role": "user", "content": f"Не годится: {problem}. Верни JSON заново."})
+        log(f"code   rejected: {problem}")
+        messages.append({"role": "user", "content": f"Not good: {problem}. Return the JSON again."})
 
-    raise RuntimeError("не уложились в отведённые круги")
+    raise RuntimeError("did not finish within the allotted turns")
 
 
 if __name__ == "__main__":

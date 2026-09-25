@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
 #
-# anthropic-env.sh — доступ к Anthropic API только в текущей сессии терминала.
+# anthropic-env.sh -- API access for the current terminal session only.
 #
-#   source ./anthropic-env.sh on       загрузит значения из ./.secrets
-#   source ./anthropic-env.sh off      снимет их
-#   source ./anthropic-env.sh status   покажет, что выставлено (факт, без значений)
+#   source ./anthropic-env.sh on       load values from ./.secrets
+#   source ./anthropic-env.sh off      unset them
+#   source ./anthropic-env.sh status   show what is set (the fact, never the value)
 #
-# ОБЯЗАТЕЛЬНО через `source` (или `.`). Запуск как ./anthropic-env.sh не сработает:
-# дочерний процесс не может менять окружение родительской оболочки. Скрипт это ловит.
+# MUST be used with `source` (or `.`). Running it as ./anthropic-env.sh will not
+# work: a child process cannot change its parent shell's environment. The script
+# detects that and says so.
 #
-# Откуда берутся значения:
-#   1. ANTHROPIC_SECRETS_FILE, если задана
-#   2. ./.secrets в текущей директории
-#   3. .secrets рядом с самим скриптом
+# Where the values come from:
+#   1. ANTHROPIC_SECRETS_FILE, if set
+#   2. ./.secrets in the current directory
+#   3. .secrets next to this script
 #
-# Формат файла — обычный shell, он подключается через source:
+# The file is plain shell, sourced as-is:
 #
 #     export ANTHROPIC_AUTH_TOKEN="..."
 #     export ANTHROPIC_BASE_URL="https://..."
 #
-# Образец лежит в .secrets.example. Файл .secrets коммитить нельзя никогда:
-# он в .gitignore, но перед раздачей репозитория участникам проверь ещё раз.
+# A template lives in .secrets.example. Never commit .secrets: it is in
+# .gitignore, but check again before handing the repository to anyone.
 
-# --- проверка, что нас подключили через source, а не запустили ----------------
+# -- were we sourced, or run? ------------------------------------------------
 
 _ae_sourced=0
 _ae_self=""
@@ -35,7 +36,7 @@ elif [ -n "${ZSH_VERSION:-}" ]; then
 fi
 
 if [ "$_ae_sourced" -ne 1 ]; then
-    echo "Этот скрипт нужно подключать, а не запускать:" >&2
+    echo "This script must be sourced, not executed:" >&2
     echo "    source ./anthropic-env.sh on" >&2
     exit 1
 fi
@@ -45,7 +46,7 @@ if [ -n "$_ae_self" ]; then
     _ae_dir="$(cd "$(dirname "$_ae_self")" 2>/dev/null && pwd)" || _ae_dir="."
 fi
 
-# --- команды -----------------------------------------------------------------
+# -- commands ---------------------------------------------------------------
 
 _ae_secrets_file() {
     if [ -n "${ANTHROPIC_SECRETS_FILE:-}" ]; then
@@ -62,8 +63,8 @@ _ae_on() {
     f="$(_ae_secrets_file)"
 
     if [ ! -f "$f" ]; then
-        echo "Не найден файл со значениями: $f" >&2
-        echo "Создать по образцу:" >&2
+        echo "No secrets file found at: $f" >&2
+        echo "Create one from the template:" >&2
         echo "    cp .secrets.example .secrets && chmod 600 .secrets" >&2
         return 1
     fi
@@ -71,15 +72,15 @@ _ae_on() {
     perms="$(stat -f '%OLp' "$f" 2>/dev/null || stat -c '%a' "$f" 2>/dev/null)"
     case "$perms" in
         600|400) : ;;
-        *) echo "ВНИМАНИЕ: права на $f = ${perms:-неизвестны}, файл виден лишним." >&2
-           echo "Починить: chmod 600 $f" >&2 ;;
+        *) echo "WARNING: permissions on $f are ${perms:-unknown}; others can read it." >&2
+           echo "Fix with: chmod 600 $f" >&2 ;;
     esac
 
     # shellcheck disable=SC1090
     . "$f"
 
     if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
-        echo "В $f нет ANTHROPIC_AUTH_TOKEN." >&2
+        echo "$f does not define ANTHROPIC_AUTH_TOKEN." >&2
         return 1
     fi
     export ANTHROPIC_AUTH_TOKEN
@@ -87,23 +88,23 @@ _ae_on() {
     if [ -n "${ANTHROPIC_BASE_URL:-}" ]; then
         export ANTHROPIC_BASE_URL
     else
-        echo "ВНИМАНИЕ: в $f нет ANTHROPIC_BASE_URL." >&2
-        echo "Без него запрос уйдёт на api.anthropic.com и упадёт с 401." >&2
+        echo "WARNING: $f does not define ANTHROPIC_BASE_URL." >&2
+        echo "Without it the request goes to api.anthropic.com and fails with 401." >&2
     fi
 
     if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-        echo "ВНИМАНИЕ: ANTHROPIC_API_KEY задан и перебьёт AUTH_TOKEN." >&2
-        echo "Сними его в этой сессии: unset ANTHROPIC_API_KEY" >&2
+        echo "WARNING: ANTHROPIC_API_KEY is set and will win over AUTH_TOKEN." >&2
+        echo "Drop it for this session: unset ANTHROPIC_API_KEY" >&2
     fi
 
-    echo "Загружено из $f. Живёт только в этой сессии терминала."
+    echo "Loaded from $f. Lives in this terminal session only."
     _ae_status
 }
 
 _ae_off() {
     unset ANTHROPIC_AUTH_TOKEN
     unset ANTHROPIC_BASE_URL
-    echo "Снято."
+    echo "Unset."
     _ae_status
 }
 
@@ -113,7 +114,7 @@ _ae_status() {
     [ -n "${ANTHROPIC_BASE_URL:-}" ]   && echo "  ANTHROPIC_BASE_URL   = set" || echo "  ANTHROPIC_BASE_URL   = unset"
 }
 
-# --- разбор аргумента --------------------------------------------------------
+# -- dispatch ---------------------------------------------------------------
 
 case "${1:-}" in
     on)     _ae_on ;;
@@ -126,8 +127,8 @@ _ae_rc=$?
 unset -f _ae_on _ae_off _ae_status _ae_secrets_file 2>/dev/null
 unset _ae_sourced _ae_self _ae_dir
 
-# код возврата нужен, чтобы можно было писать:
-#     source ./anthropic-env.sh on && python example_tool_loop.py
+# The exit code matters so you can write:
+#     source ./anthropic-env.sh on && python3 example_tool_loop.py
 if [ "$_ae_rc" -eq 0 ]; then
     unset _ae_rc
     return 0

@@ -1,18 +1,18 @@
 """
-example_cost.py — тот же агент, что и example_tool_loop.py, но с ценником.
+The same agent as example_tool_loop.py, with a price tag.
 
-После каждого хода печатает, сколько токенов ушло на вход, сколько пришло
-на выход, сколько из выхода составило скрытое размышление, и во что это обошлось.
+After every turn it prints how many tokens went in, how many came back, how much
+of the output was hidden reasoning, and what it cost.
 
-Запуск:
+Run:
     source ./anthropic-env.sh on
     python3 example_cost.py
 
-Что увидеть глазами:
-  1. Вход на втором ходу больше, чем на первом, хотя вопрос не менялся:
-     это выросла переписка, и вы платите за неё заново.
-  2. Выход меньше входа по количеству, но сопоставим по деньгам:
-     он в пять раз дороже за токен.
+What to see with your own eyes:
+  1. Input on the second turn is larger than on the first, although the question
+     never changed: the conversation grew, and you pay for it again.
+  2. Output is smaller than input in token count, but comparable in money:
+     it costs five times more per token.
 """
 
 import anthropic
@@ -21,33 +21,33 @@ client = anthropic.Anthropic()
 
 MODEL = "claude-opus-5"
 
-# Прайс в долларах за 1 000 000 токенов. Проверяйте перед докладом: цены меняются.
+# Dollars per 1,000,000 tokens. Check these before you present: prices change.
 PRICE_IN = 5.00
 PRICE_OUT = 25.00
 
-# Множители кэша: запись дороже обычного входа, чтение сильно дешевле.
-CACHE_WRITE_MULT = 1.25   # 5-минутный TTL
+# Cache multipliers: a write costs more than plain input, a read costs far less.
+CACHE_WRITE_MULT = 1.25   # 5-minute TTL
 CACHE_READ_MULT = 0.10
 
 
 TIMETABLES = {
-    "Ярославль": "5А: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
-    "Кострома": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
+    "Yaroslavl": "5A: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
+    "Kostroma": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
 }
 
 
 def read_timetable(city: str) -> str:
-    return TIMETABLES.get(city, "нет данных по этому городу")
+    return TIMETABLES.get(city, "no data for this city")
 
 
 TOOLS = [
     {
         "name": "read_timetable",
-        "description": "Возвращает сырое расписание автобусов для указанного города.",
+        "description": "Returns the raw bus timetable for a given city.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "city": {"type": "string", "description": "Название города"},
+                "city": {"type": "string", "description": "City name"},
             },
             "required": ["city"],
         },
@@ -56,10 +56,10 @@ TOOLS = [
 
 
 def money(usage) -> float:
-    """Цена одного ответа в долларах.
+    """Cost of one response, in dollars.
 
-    Внимание на input_tokens: это НЕ весь промпт, а только та его часть,
-    которая не попала в кэш. Полный размер промпта складывается из трёх полей.
+    Watch input_tokens: it is NOT the whole prompt, only the part that missed
+    the cache. Total prompt size is the sum of three fields.
     """
     fresh = usage.input_tokens
     written = getattr(usage, "cache_creation_input_tokens", 0) or 0
@@ -74,7 +74,7 @@ def money(usage) -> float:
 
 
 messages = [
-    {"role": "user", "content": "Во сколько первый автобус 5А в Ярославле?"}
+    {"role": "user", "content": "What time is the first 5A bus in Yaroslavl?"}
 ]
 
 rows = []
@@ -89,13 +89,13 @@ for turn in range(5):
     u = response.usage
     rows.append(
         {
-            "ход": len(rows) + 1,
-            "вход": u.input_tokens,
-            "выход": u.output_tokens,
-            "думал": getattr(u.output_tokens_details, "thinking_tokens", 0)
+            "turn": len(rows) + 1,
+            "in": u.input_tokens,
+            "out": u.output_tokens,
+            "thought": getattr(u.output_tokens_details, "thinking_tokens", 0)
             if getattr(u, "output_tokens_details", None)
             else 0,
-            "цена": money(u),
+            "cost": money(u),
         }
     )
 
@@ -117,20 +117,20 @@ for turn in range(5):
             )
     messages.append({"role": "user", "content": results})
 else:
-    raise RuntimeError("модель не уложилась в 5 ходов")
+    raise RuntimeError("the model did not finish within 5 turns")
 
 
-print(f"\n{'ХОД':>4} {'ВХОД':>7} {'ВЫХОД':>7} {'ДУМАЛ':>7} {'ЦЕНА':>11}")
-print("─" * 40)
+print(f"\n{'TURN':>5} {'IN':>7} {'OUT':>7} {'THOUGHT':>8} {'COST':>11}")
+print("-" * 42)
 for r in rows:
-    print(f"{r['ход']:>4} {r['вход']:>7} {r['выход']:>7} {r['думал']:>7} {'$%.5f' % r['цена']:>11}")
-print("─" * 40)
+    print(f"{r['turn']:>5} {r['in']:>7} {r['out']:>7} {r['thought']:>8} {'$%.5f' % r['cost']:>11}")
+print("-" * 42)
 print(
-    f"{'ИТОГО':>4} {sum(r['вход'] for r in rows):>7} {sum(r['выход'] for r in rows):>7}"
-    f" {sum(r['думал'] for r in rows):>7} {'$%.5f' % sum(r['цена'] for r in rows):>11}"
+    f"{'TOTAL':>5} {sum(r['in'] for r in rows):>7} {sum(r['out'] for r in rows):>7}"
+    f" {sum(r['thought'] for r in rows):>8} {'$%.5f' % sum(r['cost'] for r in rows):>11}"
 )
 
-vhod = sum(r["вход"] for r in rows) * PRICE_IN / 1e6
-vyhod = sum(r["выход"] for r in rows) * PRICE_OUT / 1e6
-print(f"\nиз них за чтение: ${vhod:.5f}   за письмо: ${vyhod:.5f}")
-print(f"\nОТВЕТ: {answer}")
+read_cost = sum(r["in"] for r in rows) * PRICE_IN / 1e6
+write_cost = sum(r["out"] for r in rows) * PRICE_OUT / 1e6
+print(f"\nfor reading: ${read_cost:.5f}   for writing: ${write_cost:.5f}")
+print(f"\nANSWER: {answer}")

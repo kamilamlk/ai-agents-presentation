@@ -1,61 +1,62 @@
-# AI in Product Development — учебные примеры
+# AI in Product Development — worked examples
 
-Минимальные работающие примеры к воркшопу: как устроен агент, из чего состоит
-харнесс, сколько это стоит и как это тестировать.
+Minimal running examples for the workshop: how an agent actually works, what a
+harness is made of, what it costs, and how to test it.
 
-Каждый файл самодостаточен, зависимость одна — `anthropic`. Один пример — одна мысль.
+Every file stands alone. One dependency, `anthropic`. One example, one idea.
 
-**Схемы и разбор:** [доска в Miro](https://miro.com/app/board/uXjVGrSH3Ho=/)
+**Diagrams and the full breakdown:** [Miro board](https://miro.com/app/board/uXjVGrSH3Ho=/)
 
-## Примеры
+## The examples
 
-| Файл | Про что | Что видно на прогоне |
+| File | About | What you see on a run |
 |---|---|---|
-| `example_tool_loop.py` | Механика вызова инструмента | Четыре хода по сети, модель просит — код делает |
-| `example_cost.py` | Цена запроса | Вход растёт сам: 404 → 528 токенов, хотя вопрос не менялся |
-| `example_cache.py` | Кэш промпта | Запись 1.25x, чтение 0.10x, экономия около половины |
-| `example_harness.py` | Проверка кодом | Модель пишет 00:15, код отклоняет, модель исправляет на 24:15 |
-| `example_rag.py` | Поиск как инструмент | Первый поиск мимо, модель переспрашивает; на втором вопросе честное «не знаю» |
-| `test_harness.py` | Тесты агента | Девять тестов, ноль обращений к API |
+| `example_tool_loop.py` | How a tool call works | Four messages over the wire; the model asks, the code acts |
+| `example_cost.py` | What a request costs | Input grows on its own: 404 → 528 tokens, same question |
+| `example_cache.py` | Prompt caching | Write 1.25x, read 0.10x, roughly half the bill saved |
+| `example_harness.py` | Verification in code | The model writes 00:15, the code rejects it, the model fixes it to 24:15 |
+| `example_rag.py` | Search as a tool | First search misses, the model rephrases; on the second question an honest "I don't know" |
+| `test_harness.py` | Testing an agent | Nine tests, zero API calls |
 
-## Запуск
+## Running it
 
 ```bash
 pip3 install anthropic
 
-cp .secrets.example .secrets && chmod 600 .secrets   # заполнить
+cp .secrets.example .secrets && chmod 600 .secrets   # fill it in
 source ./anthropic-env.sh on
 
 python3 example_tool_loop.py
 ```
 
-`anthropic-env.sh` подключается только через `source` — дочерний процесс не может
-менять окружение родителя. `off` снимает переменные, `status` показывает, что выставлено.
+`anthropic-env.sh` must be used with `source` — a child process cannot change its
+parent shell's environment. `off` unsets the variables, `status` shows what is set.
 
-Тесты работают без ключа и без сети:
+The tests need no key and no network:
 
 ```bash
 python3 test_harness.py
 ```
 
-## Четыре работы харнесса
+## The four jobs of a harness
 
-Агент — это модель плюс код вокруг неё. Код делает четыре вещи, и все четыре
-видны в `example_harness.py`:
+An agent is a model plus the code around it. That code does four things, and all
+four are visible in `example_harness.py`:
 
-1. **Инструменты** — что модели вообще позволено;
-2. **Цикл** — звать ещё раз или хватит;
-3. **Состояние** — что модель видит на этом шаге;
-4. **Проверка** — код смотрит на результат до того, как его принять.
+1. **Tools** — what the model is allowed to ask for;
+2. **The loop** — call again, or stop;
+3. **State** — what the model sees on this turn;
+4. **Verification** — code inspects the result before accepting it.
 
-Четвёртой чаще всего нет. Именно она ловит ошибку, которой нет в инструкции.
+The fourth one is usually missing. It is the one that catches the mistake no
+instruction mentioned.
 
-## Оговорки
+## Caveats
 
-Цены в `example_cost.py` и `example_cache.py` заданы константами наверху файла —
-сверяйтесь с актуальным прайсом.
+Prices in `example_cost.py` and `example_cache.py` are constants at the top of each
+file. Check them against the current price list.
 
-Через корпоративный шлюз может не проксироваться `count_tokens`. Обходной путь:
-обычный вызов с маленьким `max_tokens` и чтение `usage.input_tokens`.
+A corporate gateway may not proxy `count_tokens`. Workaround: make a normal call
+with a small `max_tokens` and read `usage.input_tokens`.
 
-Модель недетерминирована: числа от прогона к прогону отличаются на единицы токенов.
+The model is nondeterministic: numbers move by a few tokens between runs.

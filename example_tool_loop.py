@@ -1,37 +1,37 @@
 """
-Самый маленький агент, который вообще возможен.
-Один инструмент, один вопрос, четыре хода по сети.
+The smallest agent that can possibly exist.
+One tool, one question, four messages over the wire.
 
-Запуск:
+Run:
     pip3 install anthropic
     source ./anthropic-env.sh on
     python3 example_tool_loop.py
 
-Доступ подхватывается из окружения сам, кода менять не надо. SDK разрешает
-креды по порядку: ANTHROPIC_API_KEY, потом ANTHROPIC_AUTH_TOKEN, потом профиль
-`ant auth login`. Первый найденный выигрывает.
+Credentials are picked up from the environment, no code changes needed. The SDK
+resolves them in this order: ANTHROPIC_API_KEY, then ANTHROPIC_AUTH_TOKEN, then
+the `ant auth login` profile. First match wins.
 
-  - прямой ключ Anthropic  -> ANTHROPIC_API_KEY (уходит заголовком x-api-key)
-  - корпоративный шлюз     -> ANTHROPIC_AUTH_TOKEN (уходит как Authorization:
-                              Bearer) ПЛЮС обязательно ANTHROPIC_BASE_URL,
-                              иначе запрос уйдёт на api.anthropic.com и упадёт
+  - direct Anthropic key -> ANTHROPIC_API_KEY (sent as the x-api-key header)
+  - corporate gateway    -> ANTHROPIC_AUTH_TOKEN (sent as Authorization: Bearer)
+                            PLUS ANTHROPIC_BASE_URL, or the request goes to
+                            api.anthropic.com and fails
 
-Через шлюз может отличаться список доступных моделей. Проверить:
+A gateway may expose a different set of models. Check with:
     python3 -c "import anthropic; [print(m.id) for m in anthropic.Anthropic().models.list()]"
-Если claude-opus-5 в списке нет, подставьте ниже тот id, который есть.
+If claude-opus-5 is not listed, use an id that is.
 
-Что показать залу в этом файле:
-  1. Модель никогда не видит TIMETABLES. Она видит TOOLS: имя, описание, схему.
-  2. Строка `output = read_timetable(**block.input)` — единственное место,
-     где что-то реально происходит. Её выполняет ваш код, не модель.
-  3. `range(5)` — это и есть «харнесс владеет остановкой».
+Three things to point at when showing this file:
+  1. The model never sees TIMETABLES. It sees TOOLS: a name, a description, a schema.
+  2. `output = read_timetable(**block.input)` is the only line where anything
+     actually happens. Your code runs it, not the model.
+  3. `range(5)` is what "the harness owns termination" means.
 
-После запуска рядом появится wire.json: обычный отформатированный JSON, массив
-сообщений в порядке обмена. Открывается любым редактором, читать глазами.
-Файл перезаписывается на каждом ходу, так что он валиден даже если прогон упал.
+After a run you get wire.json next to this file: a plain formatted JSON array of
+every message in order. Open it in any editor. It is rewritten on every turn, so
+it stays valid even if the run dies halfway.
 
-Диагностика самого HTTP (метод, URL, статус, request_id, ретраи) включается
-переменной окружения, тела ответа она не покажет:
+HTTP-level diagnostics (method, URL, status, request_id, retries) come from an
+environment variable. It does not show response bodies:
 
     ANTHROPIC_LOG=debug python3 example_tool_loop.py
 """
@@ -44,10 +44,10 @@ import anthropic
 client = anthropic.Anthropic()
 
 
-# ── Лог провода: всё, что ушло и пришло, построчным JSON в wire.jsonl ────────
+# -- Wire log: everything sent and received, as readable JSON ----------------
 #
-# Логируем ТОЛЬКО тела. Заголовки не трогаем: там живёт токен, и ему не место
-# ни в файле, ни на проекторе. Направления названы так же, как на схеме B+.
+# Bodies only. Headers are never logged: that is where the token lives, and it
+# belongs neither in a file nor on a projector.
 
 WIRE = pathlib.Path("wire.json")
 _exchange: list = []
@@ -57,38 +57,38 @@ def wire(direction: str, payload: object) -> None:
     def encode(o: object) -> object:
         return o.model_dump(mode="json") if hasattr(o, "model_dump") else str(o)
 
-    # Снимок делаем сразу: payload держит ссылку на список messages, который
-    # дальше по циклу продолжает расти. Без round-trip в лог попала бы не та
-    # переписка, что ушла на этом ходу, а её будущее состояние.
+    # Snapshot immediately: payload holds a reference to the messages list, which
+    # keeps growing. Without the round-trip the log would show a future state of
+    # the conversation rather than what was actually sent on this turn.
     snapshot = json.loads(json.dumps({"direction": direction, "payload": payload}, default=encode))
 
     _exchange.append(snapshot)
     WIRE.write_text(json.dumps(_exchange, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-# ── Ваши данные. Модель их не увидит никогда. ────────────────────────────────
+# -- Your data. The model will never see this. ------------------------------
 
 TIMETABLES = {
-    "Ярославль": "5А: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
-    "Кострома": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
+    "Yaroslavl": "5A: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
+    "Kostroma": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
 }
 
 
 def read_timetable(city: str) -> str:
-    """Настоящая функция. Её выполняет ваш код."""
-    return TIMETABLES.get(city, "нет данных по этому городу")
+    """A real function. Your code runs it."""
+    return TIMETABLES.get(city, "no data for this city")
 
 
-# ── А это всё, что модель знает про ваш код. Ровно три вещи. ─────────────────
+# -- And this is everything the model knows about your code. Three things. ---
 
 TOOLS = [
     {
         "name": "read_timetable",
-        "description": "Возвращает сырое расписание автобусов для указанного города.",
+        "description": "Returns the raw bus timetable for a given city.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "city": {"type": "string", "description": "Название города"},
+                "city": {"type": "string", "description": "City name"},
             },
             "required": ["city"],
         },
@@ -97,52 +97,52 @@ TOOLS = [
 
 
 messages = [
-    {"role": "user", "content": "Во сколько первый автобус 5А в Ярославле?"}
+    {"role": "user", "content": "What time is the first 5A bus in Yaroslavl?"}
 ]
 
 
-# ── Весь агентский цикл. Целиком. ───────────────────────────────────────────
+# -- The whole agent loop. All of it. ---------------------------------------
 
-for turn in range(5):  # харнесс владеет остановкой, не модель
-    # Запрос собираем отдельно, чтобы его можно было увидеть и записать.
+for turn in range(5):  # the harness owns termination, not the model
+    # The request is built separately so it can be seen and logged.
     request = {
         "model": "claude-opus-5",
         "max_tokens": 4096,
         "tools": TOOLS,
         "messages": messages,
     }
-    wire("ВАШ КОД → API", request)
+    wire("YOUR CODE -> API", request)
 
     response = client.messages.create(**request)
 
-    wire("API → ВАШ КОД", response)
+    wire("API -> YOUR CODE", response)
 
-    # Ответ модели кладём в переписку как есть: на следующем ходу
-    # мы отправим её заново целиком. Модель ничего не помнит сама.
+    # The model's reply goes into the conversation as-is: on the next turn we
+    # send the whole thing again. The model remembers nothing by itself.
     messages.append({"role": "assistant", "content": response.content})
 
-    # Наивная ветка: всё, что не tool_use, считаем «готово». Для урока сойдёт,
-    # но в настоящем харнессе здесь разбор всех stop_reason: max_tokens обрезал
-    # ответ на полуслове, refusal — модель отказалась, pause_turn — серверный
-    # цикл просит продолжить. Показать полный список своего SDK:
+    # Naive branch: anything that is not tool_use counts as "done". Fine for a
+    # lesson, but a real harness handles every stop_reason: max_tokens truncated
+    # the answer, refusal means the model declined, pause_turn means the server
+    # loop wants to continue. To list what your SDK knows:
     #   python3 -c "import typing,anthropic.types as t;print(typing.get_args(t.StopReason))"
     if response.stop_reason != "tool_use":
         text = "".join(b.text for b in response.content if b.type == "text")
-        print("ОТВЕТ:", text)
+        print("ANSWER:", text)
         break
 
     results = []
     for block in response.content:
         if block.type == "tool_use":
-            print(f"МОДЕЛЬ ПРОСИТ: {block.name}({block.input})")
+            print(f"MODEL ASKS FOR: {block.name}({block.input})")
 
-            output = read_timetable(**block.input)  # ← здесь работает ваш код
+            output = read_timetable(**block.input)  # <- your code runs here
 
-            print(f"read_timetable ВЕРНУЛ: {output!r}")
+            print(f"YOUR CODE RETURNED: {output!r}")
             results.append(
                 {
                     "type": "tool_result",
-                    "tool_use_id": block.id,  # ниточка к конкретной просьбе
+                    "tool_use_id": block.id,  # the thread back to this request
                     "content": output,
                 }
             )
@@ -150,4 +150,4 @@ for turn in range(5):  # харнесс владеет остановкой, н�
     messages.append({"role": "user", "content": results})
 
 else:
-    raise RuntimeError("модель не уложилась в 5 ходов")
+    raise RuntimeError("the model did not finish within 5 turns")

@@ -1,16 +1,16 @@
-# секреты — никогда не коммитить
+# secrets — never commit
 .secrets
 .env
 *.pem
 *.key
 
-# личные материалы доклада: не публикуем
+# personal workshop material — not published
 *.pptx
 Workshop_Transcript_*.md
 PREP_*.md
 .claude/
 
-# логи провода: тел запросов много, и там бывают рабочие данные
+# wire logs: large bodies, sometimes real data
 wire.json
 wire.jsonl
 
