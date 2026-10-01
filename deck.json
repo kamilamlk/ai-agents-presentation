@@ -1,0 +1,126 @@
+{
+  "brand": "yango-group",
+  "event": "Dev Camp",
+  "slides": [
+    {
+      "layout": "cover",
+      "title": "BUILD THE HARNESS",
+      "speakers": [["Kamila Malikova", "Должность"]]
+    },
+    {
+      "layout": "agenda",
+      "heading": "WHAT WE DO",
+      "items": [
+        "Why the code around the model",
+        "How a tool call actually works",
+        "Verification in code",
+        "What a run costs",
+        "Prompt caching",
+        "Search as a tool",
+        "Workshop: your own task"
+      ]
+    },
+    {
+      "layout": "question",
+      "kicker": "What this is about",
+      "statement": "A MODEL IS NOT A FEATURE. THE CODE AROUND IT IS."
+    },
+    {
+      "layout": "list",
+      "heading": "TWO PLACES",
+      "body": "AI shows up in your work in two places, and people mix them up. One question tells them apart: if the API key is switched off tomorrow, does the product stop, or do you just type more?",
+      "groups": ["In the product", "In your process"],
+      "items": [
+        "The service calls a model at runtime",
+        "The company pays every day, forever",
+        "You call a model while you build",
+        "You pay once, production does not depend on it"
+      ]
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "The definition",
+      "heading": "A harness does four things",
+      "blocks": [
+        ["Tools", "What the model is allowed to ask for"],
+        ["The loop", "Call again, or stop"],
+        ["State", "What the model sees on this turn"],
+        ["Verification", "Code inspects the result before accepting it"]
+      ]
+    },
+    {
+      "layout": "code",
+      "heading": "THE CHECK",
+      "body": "The last trip crosses midnight. The model copies 00:05 from the timetable: well formed, plausible, wrong. Five lines of code notice and send it back.",
+      "code": "QUESTION  last trip of 5A\nmodel  asks read_timetable\nmodel  proposes\n  23:40, 23:47, 00:05\ncode   rejected\n  23:47 before 00:05\nmodel  proposes\n  23:40, 23:47, 24:05\ncode   accepted"
+    },
+    {
+      "layout": "question",
+      "kicker": "Measured, not claimed",
+      "statement": "THE CHECK COSTS NOTHING. BEING WRONG COSTS MONEY."
+    },
+    {
+      "layout": "stats",
+      "kicker": "Token economics",
+      "heading": "WHAT IT COSTS",
+      "body": "Output costs five times input. And the whole conversation is resent every round, so the input grows although the question never changed.",
+      "groups": ["Price per 1M tokens", "One harness run, three rounds"],
+      "stats": [
+        ["$5", "input"],
+        ["$25", "output"],
+        ["$0.036", "the whole run"],
+        ["40%", "was the retry"]
+      ]
+    },
+    {
+      "layout": "cards",
+      "kicker": "Prompt caching",
+      "heading": "CACHING",
+      "cards": [
+        ["Plain input, every call", "1.00x"],
+        ["A cache write, once", "1.25x"],
+        ["A cache read, after that", "0.10x"]
+      ]
+    },
+    {
+      "layout": "list",
+      "heading": "RAG",
+      "body": "Not a separate architecture. Replace read_timetable with search and you have RAG. The weak link is retrieval, not generation.",
+      "groups": ["Three steps", "What actually breaks"],
+      "items": [
+        "Index: cut documents into chunks",
+        "Search: pull chunks for this question",
+        "Answer: chunks plus the question",
+        "If the chunk is missing, the model answers anyway",
+        "Grounding must be checked, not requested"
+      ]
+    },
+    {
+      "layout": "section",
+      "tags": ["Workshop", "Your own task", "45 minutes"],
+      "statement": "NOW YOU BUILD ONE"
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "Workshop",
+      "heading": "For every idea, decide four things",
+      "blocks": [
+        ["The task", "One sentence, narrow enough to finish"],
+        ["The tools", "What the model is allowed to ask for"],
+        ["The check", "What code verifies, in five lines"],
+        ["When it stops", "How many retries, and who gets it then"]
+      ]
+    },
+    {
+      "layout": "question",
+      "kicker": "If you cannot answer this, it is not a harness yet",
+      "statement": "WHAT DOES YOUR CODE CHECK?"
+    },
+    {
+      "layout": "closing",
+      "kicker": "Ready for\nquestions",
+      "title": "KAMILA\nMALIKOVA",
+      "subtitle": "Должность"
+    }
+  ]
+}

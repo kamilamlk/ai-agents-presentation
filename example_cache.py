@@ -1,91 +1,96 @@
 """
-The same thing again, with prompt caching, and a measurement of what it saves.
+The same harness run as example_harness.py, three times, with prompt caching.
 
-Runs the same request three times in a row. This imitates a harness that calls
-the model once per page: the instructions and the tool definitions do not change
-from page to page, only the question does.
-
-Run:
     source ./anthropic-env.sh on
     python3 example_cache.py
 
+The cache is a property of the transport, not of the agent. So it lives in a
+layer that sits between the harness and the API: it prepends a long instruction
+block, marks the breakpoint, forwards the call, and counts. The harness is not
+aware any of this is happening -- same seam the tests use to slip in a fake.
+
 What to see with your own eyes:
-  run 1 - cache_creation above zero: the cache was written, you paid 1.25x
-  run 2 - cache_read above zero:     the cache was read, you paid 0.10x
+  run 1 - cache_creation above zero: the prefix was written, you paid 1.25x
+  run 2 - cache_read above zero:     the prefix was read, you paid 0.10x
   run 3 - the same
 
-ABOUT THE MINIMUM. A cacheable prefix must be at least 512 tokens (on Claude
-Opus 5; other models have different minimums, not always smaller). A shorter
-prefix is NOT cached and says nothing about it: no error, just zeros in usage.
-TOOLS alone is not enough here, they weigh about 378 tokens. That is why a system
-prompt was added, and together they clear the threshold. The script checks this
-itself and tells you if the cache did not engage.
+And the thing worth saying out loud: PREFIX is four hundred tokens of careful
+parsing rules, read on every single call, and the code still has to reject the
+answer. Nowhere does the prefix mention that a service day runs past midnight,
+because nobody had met that bug yet. A long prompt is not a substitute for a
+check. It is a list of the bugs somebody already found.
 
-The breakpoint sits on the system block rather than on the tools, because the
-prompt is assembled in this order: tools, then system, then messages. A
-breakpoint on system covers both.
+ABOUT THE MINIMUM. A prefix shorter than the model's minimum is NOT cached, and
+nothing says so: no error, just zeros in usage. The number differs by model and
+is easy to be wrong about -- measured here, a 584-token prefix cached nothing and
+a 996-token one cached fine, so this script reports the size it actually sent
+rather than trusting a constant.
+
+The breakpoint sits on the first system block, which covers everything before it:
+the prompt is assembled as tools, then system, then messages. TOOLS is about 380
+tokens and PREFIX carries the rest. The harness's own one-line system prompt goes
+in a second block, after the breakpoint, where it belongs -- it is the only part
+that could ever change.
 """
+
+import sys
 
 import anthropic
 
-client = anthropic.Anthropic()
+from example_harness import QUESTION, run
 
-MODEL = "claude-opus-5"
 PRICE_IN = 5.00
 PRICE_OUT = 25.00
 CACHE_WRITE_MULT = 1.25
 CACHE_READ_MULT = 0.10
-MIN_CACHEABLE = 512
 
 RUNS = 3
 
 
-SYSTEM = """You extract public transport timetables.
+# -- The cacheable prefix ---------------------------------------------------
+#
+# Identical on every call, which is the whole point: it is what gets cached.
+# Read it looking for the rule that would have prevented the bug. It is not here.
 
-Parsing rules:
-- Always normalise times to HH:MM:SS.
-- Write trips past midnight as 25:10:00, not 01:10:00: a service day continues
-  past midnight, and the substitution moves the trip into a different day.
-- If the source lists several routes, parse them separately and never mix their
-  times together.
-- Footnotes such as "weekdays only" belong to the calendar, not to the time.
-- If there is no data for a city, say so. Do not invent anything.
-- Never invent stops that are not in the source.
-- Answer briefly, with no preamble and without restating these rules."""
+PREFIX = """You extract public transport timetables from raw, messy sources: scanned
+tables, PDF text dumps, operator web pages, spreadsheets exported badly.
 
+OUTPUT
+- Answer with the requested structure and nothing else. No preamble, no apology,
+  no restatement of these rules, no commentary on how hard the source was.
+- When the question asks for times, give times. Do not add distances, fares,
+  journey durations, or advice about which bus to take.
 
-TIMETABLES = {
-    "Yaroslavl": "5A: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
-    "Kostroma": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
-}
+TIMES
+- Give times in HH:MM. Do not round them, and do not invent precision the source
+  does not have: a table printed to the minute stays to the minute.
+- A time is a point, not a range. If the source prints a range, keep both ends.
+- Footnote markers attached to a time belong to the calendar, not to the time.
+  Keep them out of the time itself and mention them separately if asked.
 
+ROUTES
+- Route identifiers are opaque labels. 5A, 5a, 05A and 5-A may be four different
+  routes in one city. Copy them character for character.
+- When a source lists several routes in one table, parse them separately. Never
+  merge their times into one sequence, however similar the headways look.
+- A route may run a different pattern in each direction. Unless the question names
+  a direction, do not assume the two are mirror images.
 
-def read_timetable(city: str) -> str:
-    return TIMETABLES.get(city, "no data for this city")
+STOPS
+- Stop names are copied, never normalised, never translated, never abbreviated.
+  Transliteration spellings differ between sources and both may be in use.
+- Never introduce a stop that does not appear in the source, not even an obvious
+  interchange that any local would expect to be on the line.
+- A stop with no time in a column is a stop the trip does not serve, or a cell the
+  source left blank. Either way there is no time for it. Leave it empty.
 
-
-TOOLS = [
-    {
-        "name": "read_timetable",
-        "description": "Returns the raw bus timetable for a given city.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "city": {"type": "string", "description": "City name"},
-            },
-            "required": ["city"],
-        },
-    }
-]
-
-# Here it is, the only meaningful difference: the cache breakpoint.
-SYSTEM_CACHED = [
-    {
-        "type": "text",
-        "text": SYSTEM,
-        "cache_control": {"type": "ephemeral"},
-    }
-]
+WHEN THE SOURCE IS UNCLEAR
+- Say what is missing rather than filling it in. An incomplete answer that is
+  correct is worth more than a complete one that is invented.
+- If two readings of the table are both defensible, give the one the layout
+  supports and name the other.
+- If the source contradicts itself, report the contradiction. Do not pick a side
+  silently and do not average the two."""
 
 
 def parts(usage):
@@ -112,69 +117,93 @@ def money_without_cache(usage) -> float:
     return ((fresh + written + read) * PRICE_IN + usage.output_tokens * PRICE_OUT) / 1_000_000
 
 
-def one_run():
-    """A full exchange. Returns the usage of every response."""
-    messages = [
-        {"role": "user", "content": "What time is the first 5A bus in Yaroslavl?"}
-    ]
-    used = []
+class Cached:
+    """Sits between the harness and the API. Adds the prefix, marks the breakpoint.
 
-    for _ in range(5):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=4096,
-            system=SYSTEM_CACHED,
-            tools=TOOLS,
-            messages=messages,
-        )
-        used.append(response.usage)
-        messages.append({"role": "assistant", "content": response.content})
+    The harness passes its own one-line system prompt; that line goes in a second
+    block, after the breakpoint, so it stays outside the cached part. Only the
+    prefix and the tool definitions are cached, and only they are identical from
+    one call to the next.
+    """
 
-        if response.stop_reason != "tool_use":
-            return used
+    def __init__(self, client, prefix=PREFIX):
+        self.client = client
+        self.prefix = prefix
+        self.used = []
+        self.messages = self
 
-        results = [
+    def create(self, **kw):
+        own = kw.get("system")
+        kw["system"] = [
             {
-                "type": "tool_result",
-                "tool_use_id": b.id,
-                "content": read_timetable(**b.input),
+                "type": "text",
+                "text": self.prefix,
+                "cache_control": {"type": "ephemeral"},   # <- the breakpoint
             }
-            for b in response.content
-            if b.type == "tool_use"
         ]
-        messages.append({"role": "user", "content": results})
+        if own:
+            kw["system"].append({"type": "text", "text": own})
 
-    raise RuntimeError("the model did not finish within 5 turns")
+        response = self.client.messages.create(**kw)
+        self.used.append(response.usage)
+        return response
 
 
-print(f"\n{'RUN':>5} {'FRESH':>8} {'WRITE':>8} {'READ':>8} {'OUT':>7} {'CACHED':>10} {'PLAIN':>10}")
-print("-" * 62)
+def quiet(*a, **kw):
+    pass
 
-total_cached = total_plain = 0.0
-g_fresh = g_written = g_read = g_out = 0
 
-for run in range(1, RUNS + 1):
-    used = one_run()
-    fresh = sum(parts(u)[0] for u in used)
-    written = sum(parts(u)[1] for u in used)
-    read = sum(parts(u)[2] for u in used)
-    out = sum(u.output_tokens for u in used)
-    c = sum(money(u) for u in used)
-    p = sum(money_without_cache(u) for u in used)
+client = anthropic.Anthropic()
+question = " ".join(sys.argv[1:]) or QUESTION
 
-    total_cached += c
-    total_plain += p
-    g_fresh += fresh
-    g_written += written
-    g_read += read
-    g_out += out
+# -- First the harness does its work, and says so -----------------------------
 
-    print(f"{run:>5} {fresh:>8} {written:>8} {read:>8} {out:>7} {'$%.5f' % c:>10} {'$%.5f' % p:>10}")
+rows = []
+first_round_prompt = first_segment = 0
 
-print("-" * 62)
-print(f"{'TOTAL':>5} {'':>8} {'':>8} {'':>8} {'':>7} {'$%.5f' % total_cached:>10} {'$%.5f' % total_plain:>10}")
+for n in range(1, RUNS + 1):
+    layer = Cached(client)
+    # The first run narrates itself; after that the log would only repeat.
+    run(layer, question, log=print if n == 1 else quiet)
 
+    if n == 1:
+        p = parts(layer.used[0])
+        first_round_prompt = sum(p)
+        first_segment = p[1] + p[2]      # what the breakpoint actually covered
+        
+    rows.append(
+        {
+            "run": n,
+            "rounds": len(layer.used),
+            "fresh": sum(parts(u)[0] for u in layer.used),
+            "written": sum(parts(u)[1] for u in layer.used),
+            "read": sum(parts(u)[2] for u in layer.used),
+            "out": sum(u.output_tokens for u in layer.used),
+            "cached": sum(money(u) for u in layer.used),
+            "plain": sum(money_without_cache(u) for u in layer.used),
+        }
+    )
+
+
+# -- Then the bill ------------------------------------------------------------
+
+def total(key):
+    return sum(r[key] for r in rows)
+
+
+g_fresh, g_written, g_read, g_out = (total(k) for k in ("fresh", "written", "read", "out"))
+total_cached, total_plain = total("cached"), total("plain")
 prompt_total = g_fresh + g_written + g_read
+
+print(f"\n{'RUN':>4} {'ROUNDS':>7} {'FRESH':>8} {'WRITE':>8} {'READ':>8} {'OUT':>7}"
+      f" {'CACHED':>10} {'PLAIN':>10}")
+print("-" * 70)
+for r in rows:
+    print(f"{r['run']:>4} {r['rounds']:>7} {r['fresh']:>8} {r['written']:>8} {r['read']:>8}"
+          f" {r['out']:>7} {'$%.5f' % r['cached']:>10} {'$%.5f' % r['plain']:>10}")
+print("-" * 70)
+print(f"{'TOTAL':>4} {'':>7} {g_fresh:>8} {g_written:>8} {g_read:>8} {g_out:>7}"
+      f" {'$%.5f' % total_cached:>10} {'$%.5f' % total_plain:>10}")
 
 print("\nHOW THIS WAS COMPUTED, totals across all runs")
 print(f"  fresh input  {g_fresh:>6} x ${PRICE_IN}/1M x 1.00  = ${g_fresh * PRICE_IN / 1e6:.5f}")
@@ -184,25 +213,17 @@ print(f"  output       {g_out:>6} x ${PRICE_OUT}/1M         = ${g_out * PRICE_OU
 print(f"  {'':>13}{'':>6}{'':>21}  ---------")
 print(f"  with cache   {'':>6}{'':>21}  ${total_cached:.5f}")
 print()
+print(f"  Cached segment: {first_segment} tokens -- TOOLS plus PREFIX, everything")
+print("  before the breakpoint. That is the part that never changes.")
+print()
 print(f"  Whole prompt: {g_fresh} + {g_written} + {g_read} = {prompt_total} tokens.")
 print(f"  Without a cache those same {prompt_total} would all bill at the full rate:")
 print(f"  {prompt_total} x ${PRICE_IN}/1M + {g_out} x ${PRICE_OUT}/1M = ${total_plain:.5f}")
 print("  No second run is needed for that: the tokens are measured, only the rate is hypothetical.")
 
 if g_written == 0 and g_read == 0:
-    print(
-        f"\nTHE CACHE DID NOT ENGAGE. No write, no read. Most common cause: the prefix "
-        f"is shorter than {MIN_CACHEABLE} tokens, the threshold for {MODEL}. "
-        f"This never raises an error, it only leaves zeros in usage."
-    )
-else:
-    saved = total_plain - total_cached
-    pct = saved / total_plain * 100 if total_plain else 0
-    print(f"\nSaved across {RUNS} runs: ${saved:.5f}, that is {pct:.0f}%.")
-    if g_written > 0:
-        print("The first run costs more: a cache write is 1.25x. It pays off from the second.")
-    else:
-        print(
-            "No write happened at all: the prefix was already cached by an earlier run. "
-            "An entry lives 5 minutes, so wait that long and run again to see the write."
-        )
+    print("\nTHE CACHE DID NOT ENGAGE. No write, no read, and no error either.")
+    print(f"  The first prompt was {first_round_prompt} tokens in total. Two causes, in order")
+    print("  of likelihood: the cached segment is under this model's minimum, so lengthen")
+    print("  PREFIX; or something between you and the model dropped cache_control, and a")
+    print("  corporate gateway is the usual suspect -- compare with a direct API key.")

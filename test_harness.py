@@ -7,6 +7,7 @@ The model is replaced by a stub that returns pre-recorded replies.
 """
 
 import copy
+import json
 from types import SimpleNamespace as NS
 
 from example_harness import check, run
@@ -27,7 +28,7 @@ def reply(stop_reason, *blocks):
 
 
 def answer(times):
-    body = '{"times": ' + str(list(times)).replace("'", '"') + "}"
+    body = json.dumps({"times": list(times)})
     return reply("end_turn", text_block(f"```json\n{body}\n```"))
 
 
@@ -53,11 +54,11 @@ def quiet(*a, **kw):
 # -- check(): a pure function, no model involved at all ---------------------
 
 def test_check_accepts_increasing():
-    assert check(["06:15", "06:47", "07:20"]) is None
+    assert check(["06:15", "06:22", "06:30"]) is None
 
 
-def test_check_catches_step_backwards():
-    assert "23:40" in check(["23:05", "23:40", "00:15"])
+def test_check_catches_the_midnight_step_backwards():
+    assert "23:47" in check(["23:40", "23:47", "00:05"])
 
 
 def test_check_catches_duplicates():
@@ -72,8 +73,8 @@ def test_check_survives_single_item():
 
 def test_tool_called_and_result_returned():
     c = FakeClient(
-        reply("tool_use", tool_block("read_timetable", city="Yaroslavl")),
-        answer(["06:15", "06:47"]),
+        reply("tool_use", tool_block("read_timetable", city="Tashkent")),
+        answer(["23:40", "23:47", "24:05"]),
     )
     run(c, log=quiet)
 
@@ -85,17 +86,17 @@ def test_tool_called_and_result_returned():
 
 def test_retry_after_failed_check():
     c = FakeClient(
-        answer(["23:05", "23:40", "00:15"]),   # the model got it wrong
-        answer(["23:05", "23:40", "24:15"]),   # and fixed it
+        answer(["23:40", "23:47", "00:05"]),   # the model copied the printed time
+        answer(["23:40", "23:47", "24:05"]),   # and worked out the convention
     )
-    assert run(c, log=quiet) == ["23:05", "23:40", "24:15"]
+    assert run(c, log=quiet) == ["23:40", "23:47", "24:05"]
     assert len(c.sent) == 2
     assert "Not good" in c.sent[1]["messages"][-1]["content"]
 
 
 def test_good_answer_accepted_first_time():
-    c = FakeClient(answer(["06:15", "06:47"]))
-    assert run(c, log=quiet) == ["06:15", "06:47"]
+    c = FakeClient(answer(["06:15", "06:22", "06:30"]))
+    assert run(c, log=quiet) == ["06:15", "06:22", "06:30"]
     assert len(c.sent) == 1
 
 

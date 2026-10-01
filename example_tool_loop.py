@@ -69,8 +69,8 @@ def wire(direction: str, payload: object) -> None:
 # -- Your data. The model will never see this. ------------------------------
 
 TIMETABLES = {
-    "Yaroslavl": "5A: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
-    "Kostroma": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
+    "Tashkent": "5A: 06:15, 06:47, 07:20, 07:53 | 21: 05:58, 06:30, 07:02",
+    "Samarkand": "3: 06:05, 06:40, 07:15 | 11: 06:22, 07:00",
 }
 
 
@@ -97,7 +97,7 @@ TOOLS = [
 
 
 messages = [
-    {"role": "user", "content": "What time is the first 5A bus in Yaroslavl?"}
+    {"role": "user", "content": "What time is the first 5A bus in Tashkent?"}
 ]
 
 
