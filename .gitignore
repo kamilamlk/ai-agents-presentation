@@ -4,10 +4,20 @@
 *.pem
 *.key
 
-# personal workshop material — not published
+# licensed brand fonts — not ours to publish
+deck/fonts/
+deck-fonts/
+
+# built decks and previews
 *.pptx
-Workshop_Transcript_*.md
+*.pdf
+deck/out/
+
+# personal workshop material and old artefacts — not published
+notes/
+archive/
 PREP_*.md
+Workshop_Transcript_*.md
 .claude/
 
 # wire logs: large bodies, sometimes real data

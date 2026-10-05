@@ -1,0 +1,306 @@
+{
+  "brand": "yango-group",
+  "event": "Dev Camp",
+  "slides": [
+    {
+      "layout": "cover-center",
+      "title": "BUILD THE HARNESS",
+      "speakers": [
+        [
+          "Kamila Malikova",
+          "Software developer"
+        ]
+      ]
+    },
+    {
+      "layout": "agenda",
+      "heading": "WHAT WE DO",
+      "items": [
+        "Why the code around the model",
+        "What a harness is made of",
+        "How a tool call works",
+        "Verification in code",
+        "What a run costs, and caching",
+        "Search as a tool",
+        "Workshop: your own task"
+      ]
+    },
+    {
+      "layout": "statement",
+      "kicker": "What this is about",
+      "statement": "A MODEL IS NOT A FEATURE. THE CODE AROUND IT IS."
+    },
+    {
+      "layout": "list",
+      "heading": "TWO PLACES",
+      "body": "AI shows up in your work in two places, and people mix them up. One question tells them apart: if the API key is switched off tomorrow, does the product stop, or do you just type more?",
+      "groups": [
+        "In the product",
+        "In your process"
+      ],
+      "items": [
+        "The service calls a model at runtime",
+        "It runs on every user file, every day",
+        "The company pays for as long as it lives",
+        "Switch the key off and the product stops",
+        "You call a model while you build",
+        "You pay once, and only for your own work",
+        "Nothing in production depends on it",
+        "Switch the key off and you just type more"
+      ]
+    },
+    {
+      "layout": "question",
+      "kicker": "When a task earns a harness",
+      "statement": "IT REPEATS, AND GETTING IT WRONG IS EXPENSIVE."
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "Agent = model + harness",
+      "heading": "A harness does four things",
+      "blocks": [
+        [
+          "The loop",
+          "Call the model again, or stop. And when to stop by force."
+        ],
+        [
+          "Tools",
+          "What the model may ask for. It never acts, it asks."
+        ],
+        [
+          "State",
+          "What the model sees this turn, and what to drop."
+        ],
+        [
+          "Verification",
+          "Code inspects the result before accepting it."
+        ]
+      ]
+    },
+    {
+      "layout": "code",
+      "heading": "THE CHECK",
+      "body": "The last trip crosses midnight. The model copies 00:05 from the timetable: well formed, plausible, wrong. Five lines of ordinary Python notice and send it back.",
+      "code": "model  23:40, 23:47, 00:05\ncode   rejected\n       23:47 is before 00:05\nmodel  23:40, 23:47, 24:05\ncode   accepted"
+    },
+    {
+      "layout": "question",
+      "kicker": "Six runs out of six",
+      "statement": "THE CHECK COSTS NOTHING. BEING WRONG COSTS MONEY."
+    },
+    {
+      "layout": "list",
+      "heading": "TOOL CALL",
+      "body": "The model executes nothing, it asks. Running the function is the only place your code acts, and it is where the security boundary and the spending control live.",
+      "groups": [
+        "while stop_reason == tool_use"
+      ],
+      "items": [
+        "You send the messages and the tool definitions",
+        "The model replies with stop_reason = tool_use",
+        "Your code runs the function and appends tool_result",
+        "You repeat until stop_reason is end_turn"
+      ]
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "stop_reason: seven values, four silent",
+      "heading": "Four of them arrive in silence",
+      "blocks": [
+        [
+          "max_tokens",
+          "Your own limit fired. The answer is cut mid-sentence."
+        ],
+        [
+          "pause_turn",
+          "The server loop asks to continue. Do not add «Continue»."
+        ],
+        [
+          "refusal",
+          "A safety refusal. Only here is stop_details filled in."
+        ],
+        [
+          "context window",
+          "The conversation no longer fits and nothing warns you."
+        ]
+      ]
+    },
+    {
+      "layout": "code-plain",
+      "kicker": "Appended, then resent in full",
+      "heading": "THE MESSAGES",
+      "code": "+ [0] user       question\n+ [1] assistant  tool_use\n+ [2] user       tool_result\n+ [3] assistant  00:05\n+ [4] user       rejected\n+ [5] assistant  24:05"
+    },
+    {
+      "layout": "stats",
+      "kicker": "Token economics",
+      "heading": "WHAT IT COSTS",
+      "body": "Prices here are Opus 5, as an example. Output costs five times input, and the whole list above is resent every round: 425 input tokens, then 593, then 1247, for one question that never changed.",
+      "groups": [
+        "Opus 5, per 1M tokens",
+        "One run, three rounds"
+      ],
+      "stats": [
+        [
+          "$5",
+          "input"
+        ],
+        [
+          "$25",
+          "output"
+        ],
+        [
+          "$0.036",
+          "the whole run"
+        ],
+        [
+          "56%",
+          "was the model writing"
+        ]
+      ]
+    },
+    {
+      "layout": "list",
+      "heading": "THE LEVERS",
+      "body": "A harness can pick a model per sub-task, and full delegation cannot. Every number here was measured on a real run, not taken from an article.",
+      "groups": [
+        "Three levers you own, and one you do not"
+      ],
+      "items": [
+        "A cheaper model for the mechanical sub-task",
+        "Prompt caching: 27 percent off a measured run",
+        "Batch processing: asynchronous costs half",
+        "How many rounds it takes is the model's decision"
+      ]
+    },
+    {
+      "layout": "cards",
+      "kicker": "Prompt caching",
+      "heading": "CACHING",
+      "cards": [
+        [
+          "Plain input, every call",
+          "1.00x"
+        ],
+        [
+          "A cache write, once",
+          "1.25x"
+        ],
+        [
+          "A cache read, after that",
+          "0.10x"
+        ]
+      ]
+    },
+    {
+      "layout": "statement",
+      "kicker": "27 percent off the run",
+      "statement": "PUT A DATE AT THE TOP AND THE CACHE NEVER HITS."
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "Decisions over time",
+      "heading": "Decisions move from model to code",
+      "blocks": [
+        [
+          "You know no rules",
+          "Model. Expensive and unpredictable, but it works today."
+        ],
+        [
+          "You see a pattern",
+          "In transit. Twenty examples in, a rule shows through."
+        ],
+        [
+          "The rule is in code",
+          "Code. Cheap, instant, the same answer every time."
+        ],
+        [
+          "A human at runtime",
+          "Someone presses confirm. Deliberately not automated."
+        ]
+      ]
+    },
+    {
+      "layout": "list",
+      "heading": "RAG",
+      "body": "Not a separate architecture. Replace read_timetable with search and you have RAG. The weak link is retrieval, not generation.",
+      "groups": [
+        "How it works",
+        "What actually breaks"
+      ],
+      "items": [
+        "Index: cut documents into chunks",
+        "Search: pull chunks for this question",
+        "Answer: chunks plus the question go to the model",
+        "Search is a tool like any other",
+        "If the chunk is missing, the model answers anyway",
+        "The model decides how many searches to run",
+        "Two questions, two and four searches, measured",
+        "Grounding is checked in code, not requested"
+      ]
+    },
+    {
+      "layout": "code",
+      "heading": "THE RAG CHECK",
+      "body": "An honest «not in the sources» is not the default. It happened only because the output shape allowed null and the code refused any citation that was never retrieved.",
+      "code": "if answer is None:\n    return None\nif source not in found:\n    return \"never retrieved\""
+    },
+    {
+      "layout": "section",
+      "tags": [
+        "Workshop",
+        "Your own task",
+        "40 minutes"
+      ],
+      "statement": "NOW YOU BUILD ONE"
+    },
+    {
+      "layout": "blocks4",
+      "kicker": "For every idea",
+      "heading": "Decide four things before you code",
+      "blocks": [
+        [
+          "The task",
+          "One sentence, narrow enough to finish today."
+        ],
+        [
+          "The tools",
+          "What the model is allowed to ask for."
+        ],
+        [
+          "The check",
+          "What code verifies, in five lines."
+        ],
+        [
+          "When it stops",
+          "How many retries, and who gets it then."
+        ]
+      ]
+    },
+    {
+      "layout": "list",
+      "heading": "THE FILTER",
+      "body": "The three seeded checks are of three different kinds: something must exist, numbers must match, code must run. Yours should be one of them.",
+      "groups": [
+        "Three checks that already work",
+        "Filter your idea in this order"
+      ],
+      "items": [
+        "Triage a ticket: the component must exist",
+        "Weekly digest: every number must match code",
+        "Bug report into a test: red, then green",
+        "Three kinds: it exists, it matches, it runs",
+        "Can code check the result without a human",
+        "Does the task repeat",
+        "Does the check fit in five lines",
+        "If not, it is a prompt with extra steps"
+      ]
+    },
+    {
+      "layout": "closing",
+      "kicker": "Ready for\nquestions",
+      "title": "KAMILA\nMALIKOVA",
+      "subtitle": "Software developer"
+    }
+  ]
+}

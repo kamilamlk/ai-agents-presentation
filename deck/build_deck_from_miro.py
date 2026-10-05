@@ -338,26 +338,47 @@ text(s, 64, 516, 1312, 24, "The ceiling: a cache touches input only, and 56 perc
 strip(s, 64, 676, 1312,
       "Anything that changes near the top, a date or a user id, and the cache never hits. No error, no warning, just zeros in usage and a bill 25 percent higher.")
 
-# 8 -- H. The whole conversation
+# 8 -- The whole conversation (left: what it means, right: how it sits in JSON)
 s = d.page("H", "The whole conversation",
-           "Six messages, three rounds over the wire. It accumulates in your memory, not on the server.")
-msgs = [
-    ("user", "a string", "List the times of the last trip of route 5A in Tashkent, stop by stop.", BLUE_F, BLUE_L, BLUE_D),
-    ("assistant", "text + tool_use", "I'll pull the raw timetable for Tashkent. Then: read_timetable with city Tashkent.", PUR_F, PUR_L, PUR_D),
-    ("user", "tool_result", "The raw table, exactly as the function returned it. A function produced this, and the role is still user.", BLUE_F, BLUE_L, BLUE_D),
-    ("assistant", "thinking + text", "23:40, 23:47, 00:05. The model flagged the midnight problem out loud in this same message, and wrote 00:05 anyway.", PUR_F, PUR_L, PUR_D),
-    ("user", "a string", "Not good: 23:47 comes before 00:05. Your code disagreeing: a harness has one way to speak, and it is the user role.", BLUE_F, BLUE_L, BLUE_D),
-    ("assistant", "thinking + text", "23:40, 23:47, 24:05. Accepted. Nothing in the prompt mentioned midnight.", PUR_F, PUR_L, PUR_D),
+           "On the left what it means, on the right how it sits in JSON. It accumulates in your memory, not on the server.")
+eyebrow(s, 64, 150, "SIX MESSAGES · THREE ROUNDS OVER THE WIRE")
+eyebrow(s, 736, 150, "HOW IT SITS IN JSON")
+
+rows = [
+    (170, 130, "user", ["a string"], "SENT IN ROUND 1", BLUE_F, BLUE_L, BLUE_D,
+     "List the times of the last trip of route 5A in Tashkent, stop by stop.",
+     "messages[0]",
+     '{\n  "role": "user",\n  "content": "List the times of the last\n              trip of route 5A in Tashkent…"\n}'),
+    (310, 150, "assistant", ["text", "tool_use"], "ARRIVED IN ROUND 1", PUR_F, PUR_L, PUR_D,
+     "Out loud, plus the request: read_timetable with city Tashkent.",
+     "messages[1]",
+     '{\n  "role": "assistant",\n  "content": [\n    {"type": "thinking", "thinking": "", "signature": "CAISuAUK…"},\n    {"type": "text", "text": "I\'ll pull the raw timetable…"},\n    {"type": "tool_use", "id": "toolu_019V6E…",\n     "name": "read_timetable", "input": {"city": "Tashkent"}}\n  ]\n}'),
+    (470, 130, "user", ["tool_result"], "SENT IN ROUND 2", BLUE_F, BLUE_L, BLUE_D,
+     "The raw table, exactly as the function returned it. The role is still user.",
+     "messages[2]",
+     '{\n  "role": "user",\n  "content": [\n    {"type": "tool_result",\n     "tool_use_id": "toolu_019V6E…",\n     "content": "Route 5A -- weekdays\\nstop  trip 1…"}\n  ]\n}'),
+    (636, 130, "assistant", ["thinking", "text"], "ARRIVED IN ROUND 3", PUR_F, PUR_L, PUR_D,
+     "23:40, 23:47, 24:05. Accepted. Nothing in the prompt mentioned midnight.",
+     "messages[5]",
+     '{\n  "role": "assistant",\n  "content": [\n    {"type": "thinking", "thinking": "", "signature": "CAISwgYK…"},\n    {"type": "text", "text": "…the final stop becomes 24:05."}\n  ]\n}'),
 ]
-for i, (role, blocks, body, f, l, c) in enumerate(msgs):
-    y = 166 + i * 92
-    box(s, 64, y, 1312, 86, f, l)
+
+for y, h, role, chips, rnd, f, l, c, meaning, title, code in rows:
+    box(s, 64, y, 636, h, f, l)
     text(s, 92, y + 14, 150, 26, role, P(17), c, bold=True, font=MONO)
-    chip(s, 250, y + 12, 170, blocks, l, c)
-    text(s, 92, y + 48, 1250, 30, body, P(14), BODY)
-strip(s, 64, 722, 1312,
-      "The last API response carries no history. Your code accumulates and resends the conversation; the server remembers nothing between calls.",
-      size=16, h=70)
+    for j, ch in enumerate(chips):
+        chip(s, 236 + j * 118, y + 12, 110, ch, l, c)
+    text(s, 470, y + 16, 206, 18, rnd, P(12), BODY, bold=True, align=PP_ALIGN.RIGHT)
+    text(s, 92, y + 52, 580, h - 60, meaning, P(14), BODY)
+
+    box(s, 736, y, 640, h, GREY_F)
+    text(s, 760, y + 10, 600, 16, title, P(11), BODY, bold=True, font=MONO)
+    text(s, 760, y + 30, 600, h - 40, code, P(11), INK, font=MONO, spacing=1.0)
+
+text(s, 64, 606, 636, 20, ". . . . . . . . . . .", P(14), BODY, bold=True,
+     align=PP_ALIGN.CENTER)
+text(s, 736, 606, 640, 20, "messages[3] and messages[4]: the wrong answer, and the code saying no",
+     P(12), BODY, align=PP_ALIGN.CENTER)
 
 # 9 -- I. Decisions over time
 s = d.page("I", "Decisions over time", "The scale is a route, not a one-off choice. And it has three poles, not two.")

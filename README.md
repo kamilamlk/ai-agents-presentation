@@ -9,6 +9,13 @@ writing a second one, so the table below is also the reading order.
 
 **Diagrams and the full breakdown:** [Miro board](https://miro.com/app/board/uXjVGrSH3Ho=/)
 
+## Layout
+
+```
+examples/   the workshop code: read it in the order of the table below
+deck/       the slide deck — spec in JSON, rendered separately
+```
+
 ## The examples
 
 | File | About | What you see on a run |
@@ -19,7 +26,10 @@ writing a second one, so the table below is also the reading order.
 | `example_cost.py` | What a run costs | The conversation is resent every round, and the retry has its own price tag |
 | `example_cache.py` | Prompt caching | A 984-token prefix: written once at 1.25x, read at 0.10x, 25–30% off the run |
 | `example_rag.py` | Search as a tool | First search misses, the model rephrases; on the second question an honest "I don't know" |
+| `example_headless.py` | A whole agent behind the call | `claude -p` instead of the API; the same five lines still reject 00:05, and a subprocess can hang |
+| `example_review.py` | Code before the model | Comments that name something the code no longer has — a set difference, no API key, no tokens |
 | `test_harness.py` | Testing an agent | Nine tests, zero API calls |
+| `test_review.py` | Testing the finder | Temporary repositories, no network, no git |
 
 ## Running it
 
@@ -29,7 +39,7 @@ pip3 install anthropic
 cp .secrets.example .secrets && chmod 600 .secrets   # fill it in
 source ./anthropic-env.sh on
 
-python3 example_tool_loop.py
+python3 examples/example_tool_loop.py
 ```
 
 `anthropic-env.sh` must be used with `source` — a child process cannot change its
@@ -38,7 +48,8 @@ parent shell's environment. `off` unsets the variables, `status` shows what is s
 The tests need no key and no network:
 
 ```bash
-python3 test_harness.py
+python3 examples/test_harness.py
+python3 examples/test_review.py
 ```
 
 ## The four jobs of a harness
@@ -53,6 +64,20 @@ four are visible in `example_harness.py`:
 
 The fourth one is usually missing. It is the one that catches the mistake no
 instruction mentioned.
+
+## The deck
+
+`deck/` holds the talk as data, not as a binary:
+
+| File | What it is |
+|---|---|
+| `deck_brand.json` | the current deck — 22 slides, one object per slide |
+| `deck.json` | the earlier spec, kept for history |
+| `build_deck_from_miro.py` | the standalone builder that drew the first version |
+
+Edits are made in the spec and the deck is rebuilt, not patched in PowerPoint.
+The rendered `.pptx`, the PDF and the brand fonts are not published here: the
+fonts are licensed and the deck is built from a corporate template.
 
 ## Caveats
 
