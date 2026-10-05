@@ -27,8 +27,9 @@ two, and both name real things that live outside it -- a CLI placeholder and an
 API field. Deciding which absent name is stale and which is legitimately foreign
 is the first thing here a model is actually needed for.
 
-The seam is marked at the bottom. Everything above it is this file; everything
-after it is the model saying what to do, and code checking what it said.
+The seam is printed at the end of a run. Everything before it is this file;
+everything after it is example_review_agent.py, where the model says what to do
+and code checks what it said.
 """
 
 import re
@@ -91,24 +92,32 @@ def check(word, vocabulary):
     return None
 
 
-def review(root=".", log=print):
-    root = Path(root)
-    files = sorted(p for p in root.rglob("*.py") if ".venv" not in p.parts)
+def sources(root="."):
+    """The files this check is about: Python, minus anything vendored."""
+    return sorted(p for p in Path(root).rglob("*.py") if ".venv" not in p.parts)
 
-    vocabulary = {p.stem for p in files}        # a module name is something we have
-    prose = []
-    for path in files:
-        names, said = read(path)
-        vocabulary |= names
-        prose += [(path, line, text) for line, text in said]
+
+def vocabulary(files):
+    """Everything the code has. A module name is something we have too."""
+    vocab = {p.stem for p in files}
+    for p in files:
+        names, _ = read(p)
+        vocab |= names
+    return vocab
+
+
+def review(root=".", log=print):
+    files = sources(root)
+    vocab = vocabulary(files)
+    prose = [(path, line, text) for path in files for line, text in read(path)[1]]
 
     candidates = {(p, line, w, t) for p, line, t in prose for w in mentioned(t)}
-    log(f"\nSCANNED   {len(files)} files, {len(vocabulary)} names the code has, "
+    log(f"\nSCANNED   {len(files)} files, {len(vocab)} names the code has, "
         f"{len(candidates)} mentions to judge")
 
     findings = []
     for path, line, word, text in sorted(candidates):
-        if check(word, vocabulary) is None:
+        if check(word, vocab) is None:
             findings.append((path, line, word, " ".join(text.split())[:70]))
 
     for path, line, word, snippet in findings:

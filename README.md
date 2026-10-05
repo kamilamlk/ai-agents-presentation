@@ -28,8 +28,10 @@ deck/       the slide deck — spec in JSON, rendered separately
 | `example_rag.py` | Search as a tool | First search misses, the model rephrases; on the second question an honest "I don't know" |
 | `example_headless.py` | A whole agent behind the call | `claude -p` instead of the API; the same five lines still reject 00:05, and a subprocess can hang |
 | `example_review.py` | Code before the model | Comments that name something the code no longer has — a set difference, no API key, no tokens |
+| `example_review_agent.py` | The four jobs on one task | The model judges what code could not; the same `check()` then judges the model |
 | `test_harness.py` | Testing an agent | Nine tests, zero API calls |
 | `test_review.py` | Testing the finder | Temporary repositories, no network, no git |
+| `test_review_agent.py` | Testing the four jobs | What the tool returned, what the loop did, what state was dropped, what verification refused |
 
 ## Running it
 
@@ -64,6 +66,11 @@ four are visible in `example_harness.py`:
 
 The fourth one is usually missing. It is the one that catches the mistake no
 instruction mentioned.
+
+`example_review.py` and `example_review_agent.py` are the same task split along
+that line: the half a set difference can do, and the half that needs judgement.
+In the second file each job is labelled in the source and in the log, and the
+verification is the first file's `check()` turned on the model's own answer.
 
 ## The deck
 
