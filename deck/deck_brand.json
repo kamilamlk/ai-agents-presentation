@@ -280,16 +280,16 @@
     {
       "layout": "list",
       "heading": "THE FILTER",
-      "body": "The three seeded checks are of three different kinds: something must exist, numbers must match, code must run. Yours should be one of them.",
+      "body": "Four kinds of check: something must exist, numbers must match, code must run, and the model's own answer goes back through the check. Yours should be one of them.",
       "groups": [
-        "Three checks that already work",
+        "Four checks that already work",
         "Filter your idea in this order"
       ],
       "items": [
         "Triage a ticket: the component must exist",
         "Weekly digest: every number must match code",
         "Bug report into a test: red, then green",
-        "Three kinds: it exists, it matches, it runs",
+        "Stale comments: the name must be in the code",
         "Can code check the result without a human",
         "Does the task repeat",
         "Does the check fit in five lines",
