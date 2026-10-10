@@ -50,6 +50,10 @@ def names_found(source):
     return [f[2] for f in review(tree(source), log=quiet)]
 
 
+def names_found_in(root):
+    return [f[2] for f in review(root, log=quiet)]
+
+
 def test_a_name_the_code_does_not_have_is_flagged():
     assert names_found(
         "# old_billing_hook runs first\n"
@@ -81,6 +85,20 @@ def test_a_word_only_in_a_string_counts_as_had():
         'if reason == "tool_use":\n'
         "    pass\n"
     ) == []
+
+
+def test_planted_tree_is_skipped_from_above_and_read_from_inside():
+    # fixtures/ is the exercise, so a run from the root must not see it -- but a
+    # run pointed at it must see everything in it.
+    root = Path(tempfile.mkdtemp())
+    (root / "service.py").write_text("def keep():\n    return 1\n", encoding="utf-8")
+    planted = root / "fixtures" / "orders_service"
+    planted.mkdir(parents=True)
+    (planted / "orders.py").write_text(
+        "# gone_name runs first\ndef keep():\n    return 1\n", encoding="utf-8")
+
+    assert names_found_in(root) == []
+    assert names_found_in(planted) == ["gone_name"]
 
 
 def test_unparsable_file_is_skipped_not_crashed():

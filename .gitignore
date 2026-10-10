@@ -9,7 +9,6 @@ deck/fonts/
 deck-fonts/
 
 # built decks and previews
-*.pptx
 *.pdf
 deck/out/
 
@@ -22,6 +21,7 @@ Workshop_Transcript_*.md
 
 # wire logs: large bodies, sometimes real data
 wire.json
+wire_free.json
 wire.jsonl
 wire/
 

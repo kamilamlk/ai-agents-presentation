@@ -44,7 +44,7 @@ TOOLS = [
     }
 ]
 
-QUESTION = "List the times of the last trip of route 5A in Tashkent, stop by stop."
+QUESTION = "List the times of the last trip of route 5A in Tashkent."
 
 
 def read_timetable(city):
@@ -79,7 +79,8 @@ def run(client, question=QUESTION, log=print):
             results = []
             for b in r.content:
                 if b.type == "tool_use":
-                    log(f"model     asks for {b.name}({b.input})")
+                    if b.name == "read_timetable":  
+                        log(f"model     asks for {b.name}({b.input})")
                     results.append({
                         "type": "tool_result",
                         "tool_use_id": b.id,

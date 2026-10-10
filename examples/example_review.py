@@ -93,8 +93,16 @@ def check(word, vocabulary):
 
 
 def sources(root="."):
-    """The files this check is about: Python, minus anything vendored."""
-    return sorted(p for p in Path(root).rglob("*.py") if ".venv" not in p.parts)
+    """The files this check is about: Python, minus anything vendored or planted.
+
+    fixtures/ holds a service with comment drift put there on purpose. It is the
+    exercise, not this repository's code, so a run from the root leaves it out --
+    and a run pointed straight at it still reads every file.
+    """
+    root = Path(root)
+    skip = {".venv", "fixtures"}
+    return sorted(p for p in root.rglob("*.py")
+                  if not skip & set(p.relative_to(root).parts))
 
 
 def vocabulary(files):

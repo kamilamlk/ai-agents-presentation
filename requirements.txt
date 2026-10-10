@@ -1,0 +1,10 @@
+# The only dependency the workshop examples have.
+#
+#   examples/   needs this
+#   free/       needs nothing — urllib, in free/wire.py
+#   fixtures/   is plain Python, never imported from outside
+#   deck/       render_outline.py needs nothing; build_deck_from_miro.py needs python-pptx
+#
+# The tests need neither this nor a key nor a network.
+
+anthropic

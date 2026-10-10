@@ -79,15 +79,26 @@ _ae_on() {
     # shellcheck disable=SC1090
     . "$f"
 
+    # A free-tier-only setup is a valid one: free/ needs no Anthropic token, and
+    # someone who only has a free key should still get one command to run.
+    for _ae_v in GROQ_API_KEY FREE_API_KEY FREE_BASE_URL FREE_MODEL; do
+        eval "[ -n \"\${$_ae_v:-}\" ]" && export "$_ae_v"
+    done
+    unset _ae_v
+
     if [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
-        echo "$f does not define ANTHROPIC_AUTH_TOKEN." >&2
-        return 1
+        if [ -z "${GROQ_API_KEY:-}${FREE_API_KEY:-}" ]; then
+            echo "$f defines neither ANTHROPIC_AUTH_TOKEN nor GROQ_API_KEY." >&2
+            return 1
+        fi
+        echo "No ANTHROPIC_AUTH_TOKEN in $f: examples/ will not run, free/ will."
+    else
+        export ANTHROPIC_AUTH_TOKEN
     fi
-    export ANTHROPIC_AUTH_TOKEN
 
     if [ -n "${ANTHROPIC_BASE_URL:-}" ]; then
         export ANTHROPIC_BASE_URL
-    else
+    elif [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
         echo "WARNING: $f does not define ANTHROPIC_BASE_URL." >&2
         echo "Without it the request goes to api.anthropic.com and fails with 401." >&2
     fi
@@ -104,6 +115,10 @@ _ae_on() {
 _ae_off() {
     unset ANTHROPIC_AUTH_TOKEN
     unset ANTHROPIC_BASE_URL
+    unset GROQ_API_KEY
+    unset FREE_API_KEY
+    unset FREE_BASE_URL
+    unset FREE_MODEL
     echo "Unset."
     _ae_status
 }
@@ -112,6 +127,8 @@ _ae_status() {
     [ -n "${ANTHROPIC_API_KEY:-}" ]    && echo "  ANTHROPIC_API_KEY    = set" || echo "  ANTHROPIC_API_KEY    = unset"
     [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] && echo "  ANTHROPIC_AUTH_TOKEN = set" || echo "  ANTHROPIC_AUTH_TOKEN = unset"
     [ -n "${ANTHROPIC_BASE_URL:-}" ]   && echo "  ANTHROPIC_BASE_URL   = set" || echo "  ANTHROPIC_BASE_URL   = unset"
+    [ -n "${GROQ_API_KEY:-}" ]         && echo "  GROQ_API_KEY         = set" || echo "  GROQ_API_KEY         = unset"
+    [ -n "${FREE_MODEL:-}" ]           && echo "  FREE_MODEL           = $FREE_MODEL" || echo "  FREE_MODEL           = unset (free/wire.py default)"
 }
 
 # -- dispatch ---------------------------------------------------------------
